@@ -1,47 +1,48 @@
 const bcrypt = require("bcrypt");
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
+const { options } = require("../routes/user");
 require("dotenv").config();
 
-// signup route handler
+//signup route handler
 exports.signup = async (req, res) => {
   try {
-    // get data
+    //get data
     const { name, email, password, role } = req.body;
-    // check if user already exists
+    //check if user already exist
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: "User already exists",
+        message: "User already Exists",
       });
     }
-    // secure the password
+
+    //secure password
     let hashedPassword;
     try {
       hashedPassword = await bcrypt.hash(password, 10);
     } catch (err) {
       return res.status(500).json({
         success: false,
-        message: "Error in hashing Password",
+        message: "Error inn hashing Password",
       });
     }
 
-    // create entry for user
+    //create entry for User
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
       role,
     });
-    // 200 status wala response
+
     return res.status(200).json({
       success: true,
       message: "User Created Successfully",
     });
   } catch (error) {
-    // Handle any other errors here
     console.error(error);
     return res.status(500).json({
       success: false,
@@ -50,23 +51,22 @@ exports.signup = async (req, res) => {
   }
 };
 
+//login
 exports.login = async (req, res) => {
   try {
-    // Data fetch
+    //data fetch
     const { email, password } = req.body;
-
-    // Validation on email and password
+    //validation on email and password
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Please fill all the details correctly",
+        message: "PLease fill all the details carefully",
       });
     }
 
-    // Check for a registered user
+    //check for registered user
     let user = await User.findOne({ email });
-
-    // If not a registered user
+    //if not a registered user
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -74,46 +74,52 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Verify password and generate JWT token
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (isPasswordValid) {
-      // Password matches
-      const payload = {
-        email: user.email,
-        id: user._id,
-        role: user.role,
-      };
-
-      const token = jwt.sign(payload, process.env.JWT_SECRET, {
+    const payload = {
+      email: user.email,
+      id: user._id,
+      role: user.role,
+    };
+    //verify password & generate a JWT token
+    if (await bcrypt.compare(password, user.password)) {
+      //password match
+      let token = jwt.sign(payload, process.env.JWT_SECRET, {
         expiresIn: "2h",
       });
 
+      user = user.toObject();
+      user.token = token;
       user.password = undefined;
 
-      res.cookie("token", token, {
+      const options = {
         expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
         httpOnly: true,
-      });
+      };
 
-      return res.status(200).json({
+      res.cookie("token", token, options).status(200).json({
         success: true,
         token,
         user,
-        message: "User logged in successfully",
+        message: "User Logged in successfully",
       });
+
+      // res.status(200).json({
+      //     success:true,
+      //     token,
+      //     user,
+      //     message:'User Logged in successfully',
+      // });
     } else {
-      // Password does not match
+      //passwsord do not match
       return res.status(403).json({
         success: false,
-        message: "Invalid Credentials",
+        message: "Password Incorrect",
       });
     }
   } catch (error) {
-    console.error(error);
+    console.log(error);
     return res.status(500).json({
       success: false,
-      message: "Login failure",
+      message: "Login Failure",
     });
   }
 };
